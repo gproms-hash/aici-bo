@@ -1,7 +1,6 @@
 const TOKEN = process.env.TG_TOKEN || '';
 const CHAT_ID = process.env.TG_CHAT || '';
-// 🔧 ИЗМЕНЕНИЕ 1: Повышенные пороги для математического ожидания и сниженный риск
-const THRESHOLD = 65, STRONG = 80, RISK_PCT = 1; 
+const THRESHOLD = 65, STRONG = 80, RISK_PCT = 1;
 const M5 = 300000;
 const PAIRS = ['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCAD','USDCHF','NZDUSD','EURGBP','EURJPY','GBPJPY','AUDJPY','CHFJPY','CADJPY','EURAUD','EURCAD','EURCHF','GBPAUD','GBPCAD','GBPCHF','AUDCAD','AUDCHF','CADCHF'];
 const JFILE = 'signals-bo.json';
@@ -126,9 +125,9 @@ async function newsBlock() {
 }
 
 async function ghLoad() {
-  if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_REPOSITORY) return { sha: null, data: {} };
+  if (!process.env.GITHUB_TOKEN || !process.env.GH_REPO) return { sha: null, data: {} };
   try {
-    const r = await fetch('https://api.github.com/repos/' + process.env.GITHUB_REPOSITORY + '/contents/' + JFILE, { headers: { Authorization: 'Bearer ' + process.env.GITHUB_TOKEN, Accept: 'application/vnd.github+json' } });
+    const r = await fetch('https://api.github.com/repos/' + process.env.GH_REPO + '/contents/' + JFILE, { headers: { Authorization: 'Bearer ' + process.env.GITHUB_TOKEN, Accept: 'application/vnd.github+json' } });
     if (r.ok) { const j = await r.json(); return { sha: j.sha, data: JSON.parse(Buffer.from(j.content, 'base64').toString('utf8')) }; }
     return { sha: null, data: {} };
   } catch (e) { return { sha: null, data: {} }; }
@@ -136,7 +135,7 @@ async function ghLoad() {
 
 async function ghSave(sha, data) {
   try {
-    await fetch('https://api.github.com/repos/' + process.env.GITHUB_REPOSITORY + '/contents/' + JFILE, { method: 'PUT', headers: { Authorization: 'Bearer ' + process.env.GITHUB_TOKEN, Accept: 'application/vnd.github+json', 'content-type': 'application/json' }, body: JSON.stringify({ message: 'bo journal update', content: Buffer.from(JSON.stringify(data)).toString('base64'), sha: sha || undefined }) });
+    await fetch('https://api.github.com/repos/' + process.env.GH_REPO + '/contents/' + JFILE, { method: 'PUT', headers: { Authorization: 'Bearer ' + process.env.GITHUB_TOKEN, Accept: 'application/vnd.github+json', 'content-type': 'application/json' }, body: JSON.stringify({ message: 'bo journal update', content: Buffer.from(JSON.stringify(data)).toString('base64'), sha: sha || undefined }) });
   } catch (e) { console.log('save err', e.message); }
 }
 
@@ -151,9 +150,9 @@ function signalText(p, dir, r, E, n) {
 function resultText(s, entry, exp, win, push, m) {
   const wl = m.win + m.loss;
   const wr = wl ? Math.round(100 * m.win / wl) : 0;
-  const resEmoji = push ? '↩️' : (win ? '✅' : '❌');
+  const resEmoji = push ? '↩️' : (win ? '✅' : '');
   const resText = push ? 'Возврат (цена без изменений)' : (win ? 'WIN' : 'LOSS');
-  return `📘 <b>BO ИТОГ</b>\n💱 ${pp(s.p)} ${s.dir === 1 ? '⬆' : '⬇'}\n💵 Вход: ${fmt5(entry)} → Экспирация: ${fmt5(exp)}\n${resEmoji} <b>${resText}</b>\n📊 Статистика: ${m.win}/${wl} = ${wr}% (безубыток ≈58%)`;
+  return ` <b>BO ИТОГ</b>\n💱 ${pp(s.p)} ${s.dir === 1 ? '⬆' : ''}\n💵 Вход: ${fmt5(entry)} → Экспирация: ${fmt5(exp)}\n${resEmoji} <b>${resText}</b>\n📊 Статистика: ${m.win}/${wl} = ${wr}% (безубыток ≈58%)`;
 }
 
 async function track() {
@@ -183,7 +182,6 @@ async function track() {
   if (changed) await ghSave(sha, data);
 }
 
-// 🔧 ИЗМЕНЕНИЕ 2: Функция детального отчета для ручного запуска
 async function fullReport() {
   const news = await newsBlock();
   const hour = new Date().getUTCHours();
@@ -191,7 +189,7 @@ async function fullReport() {
   const now = Date.now();
   
   let report = `📊 <b>ДЕТАЛЬНЫЙ ОТЧЕТ · M5</b>\n`;
-  report += `🕐 Время: ${new Date().toISOString().slice(11, 16)} UTC\n`;
+  report += ` Время: ${new Date().toISOString().slice(11, 16)} UTC\n`;
   report += `📅 Сессия: ${inSession ? '✅ Активна (07-19 UTC)' : '⚠️ Вне сессии (низкая волатильность)'}\n\n`;
   
   let signals = [], watch = [], skip = [];
@@ -211,9 +209,9 @@ async function fullReport() {
       } else if (r.squeeze) {
         skip.push(`📉 <b>${pp(p)}</b> - Сжатие рынка (нет волатильности)`);
       } else if (Math.abs(r.total) >= THRESHOLD) {
-        const dir = r.total > 0 ? 'CALL ⬆' : 'PUT ⬇';
+        const dir = r.total > 0 ? 'CALL ⬆' : 'PUT ';
         const exp = Math.abs(r.total) >= STRONG ? '5 мин' : '10 мин';
-        signals.push(`🟢 <b>${pp(p)}</b> - ВХОДИ СЕЙЧАС (${dir})\n   Уверенность: ${Math.abs(r.total)}% | Экспирация: ${exp}\n   Паттерн: ${r.pat.name}`);
+        signals.push(` <b>${pp(p)}</b> - ВХОДИ СЕЙЧАС (${dir})\n   Уверенность: ${Math.abs(r.total)}% | Экспирация: ${exp}\n   Паттерн: ${r.pat.name}`);
       } else if (Math.abs(r.total) >= 40) {
         const dir = r.total > 0 ? 'CALL' : 'PUT';
         watch.push(`🟡 <b>${pp(p)}</b> - НАБЛЮДАЙ (готовится ${dir})\n   Уверенность: ${Math.abs(r.total)}% (нужно ${THRESHOLD}%)`);
@@ -241,14 +239,12 @@ async function fullReport() {
 async function ci() {
   if (!TOKEN || !CHAT_ID) { console.log('no secrets'); return; }
   
-  // Режим ручного отчета (запускается через workflow_dispatch с command=report)
   if (process.env.COMMAND === 'report') {
     const report = await fullReport();
     await send(CHAT_ID, report);
     return;
   }
 
-  // Автоматический режим (по расписанию)
   await track();
   const hour = new Date().getUTCHours();
   if (hour < 7 || hour > 19) { console.log('outside session'); return; }
@@ -276,7 +272,6 @@ async function ci() {
       data.open = data.open || {};
       if (data.open[p]) continue;
       
-      // 🔧 ИЗМЕНЕНИЕ 3: Сильный сигнал = 5 мин, средний = 10 мин
       const n = Math.abs(r.total) >= STRONG ? 1 : 2; 
       
       await send(CHAT_ID, signalText(p, dir, r, E, n));
