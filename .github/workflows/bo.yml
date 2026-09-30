@@ -1,16 +1,28 @@
-name: aici-bo
+name: BO Trading Bot
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: '*/5 * * * *'
   workflow_dispatch:
-permissions:
-  contents: write
+    inputs:
+      command:
+        description: 'Command (report для ручного отчета)'
+        required: false
+        default: ''
+        type: string
+
 jobs:
-  run:
+  run-bot:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: node bo.js
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Run Bot
+        run: node index.js
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT: ${{ secrets.TG_CHAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          COMMAND: ${{ github.event.inputs.command }}
