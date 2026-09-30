@@ -1,0 +1,29 @@
+name: Manual Market Report
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 'Тип отчета'
+        required: true
+        default: 'report'
+        type: choice
+        options:
+          - report
+          - stats
+
+jobs:
+  run-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Run Report
+        run: node index.js
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          COMMAND: ${{ github.event.inputs.command }}
